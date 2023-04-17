@@ -17,14 +17,14 @@ fi
 if [ "$3" != "" ]; then
     image_name="$3"
 elif [[ -z "${image_name}" ]]; then
-    image_name=${crispdev}
+    image_name=${dev}
 fi
 echo image_name=${image_name}
 
 if [ "$4" != "" ]; then
     CONTAINER_NAME="$4"
 elif [[ -z "${CONTAINER_NAME}" ]]; then
-    CONTAINER_NAME='crispdev'
+    CONTAINER_NAME='sm'
 fi
 echo CONTAINER_NAME=${CONTAINER_NAME}
 

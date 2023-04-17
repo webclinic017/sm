@@ -2,7 +2,7 @@ name: sm
 description: System modeling playground
 dockerbuild:
 - name: job
-  dockerfile: dockerfile
+  dockerfile: dockerfile-job
   context: .
   build_arg:
   - key: IMAGE
@@ -10,7 +10,7 @@ dockerbuild:
   - key: SUDOUSER
     value: ai
 - name: dev
-  dockerfile: dockerfile-job
+  dockerfile: dockerfile
   context: .
   build_arg:
   - key: IMAGE
@@ -20,12 +20,12 @@ dockerbuild:
 version:
   major: 0
   minor: 0
-  patch: 8
+  patch: 11
   label: ''
 gpus: all
 registry: localhost:32000
 image_names:
 - name: job
-  image_name: localhost:32000/job:0.0.8
+  image_name: localhost:32000/job:0.0.11
 - name: dev
-  image_name: localhost:32000/dev:0.0.8
+  image_name: localhost:32000/dev:0.0.11

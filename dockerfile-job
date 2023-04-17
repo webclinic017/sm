@@ -7,10 +7,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN --mount=type=cache,target=/var/cache/apt \ 
     apt-get update -y && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
-    ffmpeg \
     wget && \
-    python-is-python3 && \
     rm -rf /var/lib/apt/lists/*
 
 #RUN useradd -D user
@@ -21,7 +18,7 @@ COPY requirements-job.txt .
 RUN --mount=type=cache,target=/var/cache/apt \
     pip3 install -r requirements-job.txt
 
-RUN echo 'alias py=python3' | sudo tee ~/.bashrc
+RUN echo 'alias py=python3' >> ~/.bashrc
 
 WORKDIR /app
 ENV LANG C.UTF-8

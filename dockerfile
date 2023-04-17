@@ -47,6 +47,6 @@ RUN --mount=type=cache,target=/var/cache/apt \
 EXPOSE 22 3000 5000 6006 8888
 
 # Launch container
-#CMD ["/bin/bash"]
-CMD ["/usr/sbin/sshd", "-D"]
+CMD ["/bin/bash"]
+#CMD ["/usr/sbin/sshd", "-D"]
 #CMD ["./run.sh"]
