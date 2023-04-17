@@ -15,3 +15,19 @@ handle parametric dependencies
     - statistical and machine learning algorithms [36, 37] for network clustering
     - Assume nonlinear dynamic system dx/dt = f(x,t)
     -  The method introduced in [18] seeks to identify f via sequential threshold least-squares
+
+
+Deep learning in Dynamcic systems
+[Linear Transformers Are Secretly Fast Weight Programmers](https://arxiv.org/pdf/2102.11174.pdf).  [Video discussion](https://www.youtube.com/watch?v=RSSVWpBak6s).  Makes a strong parallel between transformers and LTI systems treated as a data retrieval problem.  Investigates eliminating the softmax.  
+[Creating a Linear Transformer Model for Circuit Simulations](https://resources.pcb.cadence.com/blog/2019-creating-a-linear-transformer-model-for-circuit-simulations)
+
+[Tensorized Transformer for Dynamical Systems Modeling](https://arxiv.org/pdf/2006.03445.pdf)
+[Transformers for modeling physical systems](https://openreview.net/pdf/c45d1ade1683075a8a4e5bfe568cf3915805af44.pdf).  [Related works](https://deepai.org/publication/tensorized-transformer-for-dynamical-systems-modeling)
+[Deep Learning for Dynamics — the Intuitions](https://towardsdatascience.com/deep-learning-for-dynamics-the-intuitions-20a67942dfbc)
+[DNN - Tutorial 2 Part I: Physics inspired Machine Learning](https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/DL2/Dynamical_Neural_Networks/Complete_DNN_2_1.html)
+[Integrating Deep Learning with the Theory of Nonlinear, Chaotic, and History-Dependent Dynamics](https://dataspace.princeton.edu/handle/88435/dsp01r494vp26b)
+[Reconstruction of the flame nonlinear response using deep learning algorithms](https://aip.scitation.org/doi/10.1063/5.0131928)
+[Redesigning the Transformer Architecture with Insights from Multi-particle Dynamical Systems](https://proceedings.neurips.cc/paper/2021/file/2bd388f731f26312bfc0fe30da009595-Paper.pdf)
+[Deep Learning to Discover Coordinates for Dynamics: Autoencoders & Physics Informed Machine Learning](https://www.youtube.com/watch?v=KmQkDgu-Qp0)
+[Sparse Identification of Nonlinear Dynamics (SINDy): Sparse Machine Learning Models 5 Years Later!](https://www.youtube.com/watch?v=NxAn0oglMVw)
+[Bridging Physics-based and Data-driven modeling for Learning Dynamical Systems](https://par.nsf.gov/servlets/purl/10322792)

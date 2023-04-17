@@ -1,0 +1,2 @@
+tensorboard==2.10.0 
+tensorboardX==2.5.1  
