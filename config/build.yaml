@@ -1,0 +1,31 @@
+name: sm
+description: System modeling playground
+dockerbuild:
+- name: job
+  dockerfile: dockerfile
+  context: .
+  build_arg:
+  - key: IMAGE
+    value: nvcr.io/nvidia/pytorch:22.09-py3
+  - key: SUDOUSER
+    value: ai
+- name: dev
+  dockerfile: dockerfile-job
+  context: .
+  build_arg:
+  - key: IMAGE
+    value: smtrain
+  - key: SUDOUSER
+    value: ai
+version:
+  major: 0
+  minor: 0
+  patch: 8
+  label: ''
+gpus: all
+registry: localhost:32000
+image_names:
+- name: job
+  image_name: localhost:32000/job:0.0.8
+- name: dev
+  image_name: localhost:32000/dev:0.0.8
