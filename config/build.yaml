@@ -13,12 +13,12 @@ dockerbuild:
 version:
   major: 0
   minor: 0
-  patch: 13
+  patch: 14
   label: ''
 gpus: all
 registry: localhost:32000
 image_names:
 - name: job
-  image_name: localhost:32000/job:0.0.13
+  image_name: localhost:32000/job:0.0.14
 - name: dev
-  image_name: localhost:32000/dev:0.0.13
+  image_name: localhost:32000/dev:0.0.14
