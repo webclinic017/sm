@@ -4,19 +4,12 @@ dockerbuild:
 - name: job
   dockerfile: dockerfile-job
   context: .
-  build_arg:
-  - key: IMAGE
-    value: nvcr.io/nvidia/pytorch:22.09-py3
-  - key: SUDOUSER
-    value: ai
 - name: dev
   dockerfile: dockerfile
   context: .
   build_arg:
   - key: IMAGE
-    value: smtrain
-  - key: SUDOUSER
-    value: ai
+    value: job
 version:
   major: 0
   minor: 0
