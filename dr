@@ -10,8 +10,8 @@ if [ "$2" != "" ]; then
     gpus="$2"
 elif [[ -z "${gpus}" ]]; then
     #gpus='"device=0,1"'
-    gpus='"device=0"'
-    #gpus='all' 
+    #gpus='"device=0"'
+    gpus='all' 
 fi
 
 if [ "$3" != "" ]; then
@@ -24,7 +24,7 @@ echo image_name=${image_name}
 if [ "$4" != "" ]; then
     CONTAINER_NAME="$4"
 elif [[ -z "${CONTAINER_NAME}" ]]; then
-    CONTAINER_NAME='sm'
+    CONTAINER_NAME='dev'
 fi
 echo CONTAINER_NAME=${CONTAINER_NAME}
 
@@ -41,29 +41,16 @@ echo UTIL_PORTS ${PORT1} ${PORT2} ${PORT3} ${PORT4} ${PORT5}
 docker stop ${CONTAINER_NAME} || true && docker rm ${CONTAINER_NAME} || true
 
 set -x
-# docker run -it --rm --gpus $gpus --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
-#     -v "$(pwd):/app" \
-#     -p $SSH_PORT:22 \
-#     -p ${PORT1}:3000 \
-#     -p ${PORT2}:5000 \
-#     -p ${PORT3}:6006 \
-#     -p ${PORT4}:8888 \
-#     --name $CONTAINER_NAME \
-#     -v /data1:/data1 \
-#     -v /data2:/data2 \
-#     -v /data3:/data3 \
-#     -v /data4:/data4 \
-#     ${image_name}
 
-docker run --ipc=host --gpus $gpus --restart unless-stopped  \
+docker run  -it --rm --gpus $gpus --ipc=host  \
     --name $CONTAINER_NAME \
     -p $SSH_PORT:22 \
     -p ${PORT1}:3000 \
     -p ${PORT2}:5000 \
     -p ${PORT3}:6006 \
     -p ${PORT4}:8888 \
-    -v /data1:/data1 \
-    -v /data2:/data2 \
-    -v /data3:/data3 \
-    -v /data4:/data4 \
-    ${image_name} &
+    -v /farm:/farm \
+    -v /ssd:/ssd \
+    -v "$(pwd):/app" \
+    --entrypoint=/bin/bash \
+    ${image_name}
