@@ -181,6 +181,7 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
 
     WORLD_SIZE = torch.cuda.device_count()
+    #WORLD_SIZE = 1
     mp.spawn(fsdp_main,
         args=(WORLD_SIZE, args),
         nprocs=WORLD_SIZE,
