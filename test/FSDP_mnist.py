@@ -1,5 +1,5 @@
 # Based on: https://github.com/pytorch/examples/blob/master/mnist/main.py
-import os
+import os, sys
 import argparse
 import functools
 import torch
@@ -27,10 +27,11 @@ from torch.distributed.fsdp.wrap import (
 )
 
 def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_ADDR'] = '192.168.0.163'
     os.environ['MASTER_PORT'] = '12355'
 
     # initialize the process group
+    #dist.init_process_group("gloo", rank=rank, world_size=world_size)
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -101,7 +102,7 @@ def test(model, rank, world_size, test_loader):
         print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, int(ddp_loss[1]), int(ddp_loss[2]),
             100. * ddp_loss[1] / ddp_loss[2]))
-        
+
 def fsdp_main(rank, world_size, args):
     setup(rank, world_size)
 
@@ -110,20 +111,20 @@ def fsdp_main(rank, world_size, args):
         transforms.Normalize((0.1307,), (0.3081,))
     ])
 
-    dataset1 = datasets.MNIST('data', train=True, download=True, transform=transform)
-    sampler1 = DistributedSampler(dataset1, rank=rank, num_replicas=world_size, shuffle=True)
+    train_dset = datasets.MNIST('data', train=True, download=True, transform=transform)
+    train_sampler = DistributedSampler(train_dset, rank=rank, num_replicas=world_size, shuffle=True)
 
-    dataset2 = datasets.MNIST('data', train=False, transform=transform)
-    sampler2 = DistributedSampler(dataset2, rank=rank, num_replicas=world_size)
+    test_dset = datasets.MNIST('data', train=False, transform=transform)
+    test_sampler = DistributedSampler(test_dset, rank=rank, num_replicas=world_size)
 
-    train_kwargs = {'batch_size': args.batch_size, 'sampler': sampler1}
-    test_kwargs = {'batch_size': args.test_batch_size, 'sampler': sampler2}
+    train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler}
+    test_kwargs = {'batch_size': args.test_batch_size, 'sampler': test_sampler}
     cuda_kwargs = {'num_workers': 2, 'pin_memory': True, 'shuffle': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
 
-    train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
+    train_loader = torch.utils.data.DataLoader(train_dset,**train_kwargs)
+    test_loader = torch.utils.data.DataLoader(test_dset, **test_kwargs)
 
     init_start_event = torch.cuda.Event(enable_timing=True)
     init_end_event = torch.cuda.Event(enable_timing=True)
@@ -132,12 +133,13 @@ def fsdp_main(rank, world_size, args):
     model = Net().to(rank)
     model = FSDP(model)
 
+    # optimizer = optim.SGD(model.parameters(), lr=args.lr)
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
 
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     init_start_event.record()
     for epoch in range(1, args.epochs + 1):
-        train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=sampler1)
+        train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
         test(model, rank, world_size, test_loader)
         scheduler.step()
 

@@ -1,5 +1,6 @@
-import os
-import sys
+import os, sys
+import argparse
+import functools
 import tempfile
 import torch
 import torch.distributed as dist
@@ -9,23 +10,28 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torchvision import datasets, transforms
 
+from torch.optim.lr_scheduler import StepLR
+
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.fully_sharded_data_parallel import (
+    CPUOffload,
+    BackwardPrefetch,
+)
+from torch.distributed.fsdp.wrap import (
+    size_based_auto_wrap_policy,
+    enable_wrap,
+    wrap,
+)
+
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 
-# On Windows platform, the torch.distributed package only
-# supports Gloo backend, FileStore and TcpStore.
-# For FileStore, set init_method parameter in init_process_group
-# to a local file. Example as follow:
-# init_method="file:///f:/libtmp/some_file"
-# dist.init_process_group(
-#    "gloo",
-#    rank=rank,
-#    init_method=init_method,
-#    world_size=world_size)
-# For TcpStore, same way as on Linux.
-
 def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_ADDR'] = '192.168.0.163'
     os.environ['MASTER_PORT'] = '12355'
 
     # initialize the process group
@@ -35,133 +41,154 @@ def setup(rank, world_size):
 def cleanup():
     dist.destroy_process_group()
 
-class BasicNet(nn.Module):
+class Net(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
         self.conv2 = nn.Conv2d(32, 64, 3, 1)
         self.dropout1 = nn.Dropout(0.25)
         self.dropout2 = nn.Dropout(0.5)
         self.fc1 = nn.Linear(9216, 128)
         self.fc2 = nn.Linear(128, 10)
-        self.act = F.relu
 
     def forward(self, x):
-        x = self.act(self.conv1(x))
-        x = self.act(self.conv2(x))
+
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
         x = F.max_pool2d(x, 2)
         x = self.dropout1(x)
         x = torch.flatten(x, 1)
-        x = self.act(self.fc1(x))
+        x = self.fc1(x)
+        x = F.relu(x)
         x = self.dropout2(x)
         x = self.fc2(x)
         output = F.log_softmax(x, dim=1)
         return output
+    
+def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
+    model.train()
+    ddp_loss = torch.zeros(2).to(rank)
+    if sampler:
+        sampler.set_epoch(epoch)
+    for batch_idx, (data, target) in enumerate(train_loader):
+        data, target = data.to(rank), target.to(rank)
+        optimizer.zero_grad()
+        output = model(data)
+        loss = F.nll_loss(output, target, reduction='sum')
+        loss.backward()
+        optimizer.step()
+        ddp_loss[0] += loss.item()
+        ddp_loss[1] += len(data)
 
-def demo_basic(rank, world_size, epochs, batch_size):
-    print(f"Running basic DDP example on rank {rank}.")
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+    if rank == 0:
+        print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
+
+def test(model, rank, world_size, test_loader):
+    model.eval()
+    correct = 0
+    ddp_loss = torch.zeros(3).to(rank)
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(rank), target.to(rank)
+            output = model(data)
+            ddp_loss[0] += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+            ddp_loss[1] += pred.eq(target.view_as(pred)).sum().item()
+            ddp_loss[2] += len(data)
+
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+
+    if rank == 0:
+        test_loss = ddp_loss[0] / ddp_loss[2]
+        print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
+            test_loss, int(ddp_loss[1]), int(ddp_loss[2]),
+            100. * ddp_loss[1] / ddp_loss[2]))
+
+def ddp_main(rank, world_size, args):
     setup(rank, world_size)
-    pin_memory = False
-    num_workers = 0
 
-    # Build DataLoaders
-    transform = transforms.Compose([
+    transform=transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307), (0.3081))
+        transforms.Normalize((0.1307,), (0.3081,))
     ])
 
     train_dset = datasets.MNIST('data', train=True, download=True, transform=transform)
-    train_sampler = DistributedSampler(train_dset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=False)
-    train_loader = torch.utils.data.DataLoader(train_dset, 
-                                               batch_size=batch_size, 
-                                               pin_memory=pin_memory, 
-                                               num_workers=num_workers, 
-                                               drop_last=False, 
-                                               shuffle=False, 
-                                               sampler=train_sampler)
+    train_sampler = DistributedSampler(train_dset, rank=rank, num_replicas=world_size, shuffle=True)
 
     test_dset = datasets.MNIST('data', train=False, transform=transform)
-    test_sampler = DistributedSampler(test_dset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=False)
-    test_loader = torch.utils.data.DataLoader(test_dset, shuffle=False, batch_size=batch_size, sampler=test_sampler)
+    test_sampler = DistributedSampler(test_dset, rank=rank, num_replicas=world_size)
 
-    # create model and move it to GPU with id rank
-    model = BasicNet().to(rank)
-    ddp_model = DDP(model, device_ids=[rank])
+    train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler}
+    test_kwargs = {'batch_size': args.test_batch_size, 'sampler': test_sampler}
+    cuda_kwargs = {'num_workers': 2, 'pin_memory': True, 'shuffle': False}
+    train_kwargs.update(cuda_kwargs)
+    test_kwargs.update(cuda_kwargs)
 
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
+    train_loader = torch.utils.data.DataLoader(train_dset,**train_kwargs)
+    test_loader = torch.utils.data.DataLoader(test_dset, **test_kwargs)
 
-    for epoch in range(epochs):
-        # if we are using DistributedSampler, we have to tell it 
-        train_loader.sampler.set_epoch(epoch) 
+    init_start_event = torch.cuda.Event(enable_timing=True)
+    init_end_event = torch.cuda.Event(enable_timing=True)
 
-        for step, x in enumerate(train_loader):
-            optimizer.zero_grad(set_to_none=True)
-            
-            pred = ddp_model(x[0])
-            classifications = torch.argmax(pred, 1)
-            label = x[1].to(pred.device)
-            
-            loss = loss_fn(pred, label)
-            loss.backward()
-            optimizer.step()
+    torch.cuda.set_device(rank)
+    model = Net().to(rank)
+    model = DDP(model)
 
-    cleanup()
-    
-def demo_checkpoint(rank, world_size, epochs):
-    print(f"Running DDP checkpoint example on rank {rank}.")
-    setup(rank, world_size)
+    # optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
 
-    model = BasicNet().to(rank)
-    ddp_model = DDP(model, device_ids=[rank])
+    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+    init_start_event.record()
+    for epoch in range(1, args.epochs + 1):
+        train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
+        test(model, rank, world_size, test_loader)
+        scheduler.step()
 
-    CHECKPOINT_PATH = tempfile.gettempdir() + "/model.checkpoint"
-    if rank == 0:
-        # All processes should see same parameters as they all start from same
-        # random parameters and gradients are synchronized in backward passes.
-        # Therefore, saving it in one process is sufficient.
-        torch.save(ddp_model.state_dict(), CHECKPOINT_PATH)
-
-    # Use a barrier() to make sure that process 1 loads the model after process
-    # 0 saves it.
-    dist.barrier()
-    # configure map_location properly
-    map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
-    ddp_model.load_state_dict(
-        torch.load(CHECKPOINT_PATH, map_location=map_location))
-
-    loss_fn = nn.MSELoss()
-    optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
-
-    optimizer.zero_grad()
-    outputs = ddp_model(torch.randn(20, 10))
-    labels = torch.randn(20, 5).to(rank)
-
-    loss_fn(outputs, labels).backward()
-    optimizer.step()
-
-    # Not necessary to use a dist.barrier() to guard the file deletion below
-    # as the AllReduce ops in the backward pass of DDP already served as
-    # a synchronization.
+    init_end_event.record()
 
     if rank == 0:
-        os.remove(CHECKPOINT_PATH)
+        print(f"CUDA event elapsed time: {init_start_event.elapsed_time(init_end_event) / 1000}sec")
+        print(f"{model}")
+
+    if args.save_model:
+        # use a barrier to make sure training is done on all ranks
+        dist.barrier()
+        # state_dict for FSDP model is only available on Nightlies for now
+        states = model.state_dict()
+        if rank == 0:
+            torch.save(states, "mnist_cnn.pt")
 
     cleanup()
 
+if __name__ == '__main__':
+    # Training settings
+    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+                        help='input batch size for training (default: 64)')
+    parser.add_argument('--test-batch-size', type=int, default=60000, metavar='N',
+                        help='input batch size for testing (default: 1000)')
+    parser.add_argument('--epochs', type=int, default=10, metavar='N',
+                        help='number of epochs to train (default: 14)')
+    parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
+                        help='learning rate (default: 1.0)')
+    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
+                        help='Learning rate step gamma (default: 0.7)')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    parser.add_argument('--save-model', action='store_true', default=False,
+                        help='For Saving the current Model')
+    args = parser.parse_args()
 
-def run_demo(demo_fn, world_size, epochs, batch_size):
-    mp.spawn(demo_fn,
-             args=(world_size,epochs, batch_size),
-             nprocs=world_size,
-             join=True)
+    torch.manual_seed(args.seed)
 
-if __name__ == "__main__":
-    epochs = 3
-    batch_size = 15000
-    n_gpus = torch.cuda.device_count()
-    assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
-    world_size = n_gpus
-    # world_size = 1
-    run_demo(demo_basic, world_size, epochs, batch_size)
-    #run_demo(demo_checkpoint, world_size, epochs)
+    WORLD_SIZE = torch.cuda.device_count()
+    #WORLD_SIZE = 1
+    mp.spawn(ddp_main,
+        args=(WORLD_SIZE, args),
+        nprocs=WORLD_SIZE,
+        join=True)
