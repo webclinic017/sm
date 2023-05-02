@@ -36,4 +36,4 @@ COPY creds.yaml creds.yaml
 
 
 # Launch training
-CMD ["python3","-u", "test/ddpmnist.py"]
+CMD ["python3","-u", "test/FSDP_mnist.py"]

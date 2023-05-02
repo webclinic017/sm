@@ -1,17 +1,16 @@
-# Based on: https://github.com/pytorch/examples/blob/master/mnist/main.py
 import os, sys
 import argparse
 import functools
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.multiprocessing as mp
 from torchvision import datasets, transforms
 
 from torch.optim.lr_scheduler import StepLR
 
-import torch.distributed as dist
-import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -183,7 +182,11 @@ if __name__ == '__main__':
 
     WORLD_SIZE = torch.cuda.device_count()
     #WORLD_SIZE = 1
-    mp.spawn(fsdp_main,
-        args=(WORLD_SIZE, args),
-        nprocs=WORLD_SIZE,
-        join=True)
+
+    processes = []
+    for rank in range(WORLD_SIZE):
+        p = mp.Process(target=fsdp_main, args=(rank, WORLD_SIZE, args))
+        p.start()
+        processes.append(p)
+    for p in processes:
+        p.join()

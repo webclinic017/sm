@@ -1,7 +1,6 @@
 import os, sys
 import argparse
 import functools
-import tempfile
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -24,9 +23,6 @@ from torch.distributed.fsdp.wrap import (
     enable_wrap,
     wrap,
 )
-
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = '192.168.0.163'
@@ -186,11 +182,6 @@ if __name__ == '__main__':
 
     WORLD_SIZE = torch.cuda.device_count()
     #WORLD_SIZE = 1
-
-    # mp.spawn(ddp_main,
-    #     args=(WORLD_SIZE, args),
-    #     nprocs=WORLD_SIZE,
-    #     join=True)
 
     processes = []
     for rank in range(WORLD_SIZE):
