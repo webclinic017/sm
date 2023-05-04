@@ -163,6 +163,7 @@ def fsdp_main(rank, world_size, args):
     cleanup()
 
 if __name__ == '__main__':
+    mp.set_start_method("spawn")
     print(__name__)
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
