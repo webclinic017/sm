@@ -25,6 +25,7 @@ from torch.distributed.fsdp.wrap import (
 )
 
 def setup(rank, world_size):
+    print(f'start setup  {rank=}')
     os.environ['MASTER_ADDR'] = '192.168.0.163'
     os.environ['MASTER_PORT'] = '12355'
 
@@ -62,6 +63,7 @@ class Net(nn.Module):
         return output
     
 def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
+    print(f'start train  rank {rank=}')
     model.train()
     ddp_loss = torch.zeros(2).to(rank)
     if sampler:
@@ -81,6 +83,7 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 
 def test(model, rank, world_size, test_loader):
+    print(f'start test rank {rank=}')
     model.eval()
     correct = 0
     ddp_loss = torch.zeros(3).to(rank)
@@ -102,7 +105,7 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 
 def fsdp_main(rank, world_size, args):
-    print(__name__)
+    print(f'start fsdp_main {rank=}')
     setup(rank, world_size)
 
     transform=transforms.Compose([
@@ -138,6 +141,7 @@ def fsdp_main(rank, world_size, args):
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     init_start_event.record()
     for epoch in range(1, args.epochs + 1):
+        print(f'fsdp_main start {rank=} {epoch=}')
         train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
         test(model, rank, world_size, test_loader)
         scheduler.step()
