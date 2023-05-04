@@ -102,7 +102,6 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 
 def ddp_main(rank, world_size, args):
-    mp.set_start_method("spawn")
     print(__name__)
     setup(rank, world_size)
     transform=transforms.Compose([
@@ -160,6 +159,7 @@ def ddp_main(rank, world_size, args):
 
 if __name__ == '__main__':
     print(__name__)
+    mp.set_start_method("spawn")
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
