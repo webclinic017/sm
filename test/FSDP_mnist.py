@@ -102,6 +102,7 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 
 def fsdp_main(rank, world_size, args):
+    print(__name__)
     setup(rank, world_size)
 
     transform=transforms.Compose([
@@ -158,6 +159,7 @@ def fsdp_main(rank, world_size, args):
     cleanup()
 
 if __name__ == '__main__':
+    print(__name__)
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
@@ -182,7 +184,7 @@ if __name__ == '__main__':
 
     WORLD_SIZE = torch.cuda.device_count()
     #WORLD_SIZE = 1
-
+    print('Start mp.Process')
     processes = []
     for rank in range(WORLD_SIZE):
         p = mp.Process(target=fsdp_main, args=(rank, WORLD_SIZE, args))

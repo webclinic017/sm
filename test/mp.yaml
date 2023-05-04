@@ -1,0 +1,88 @@
+# yamllint disable-line rule:line-length
+workflow:
+  metadata:
+    generateName: mp-argo-
+  annotations:
+    workflows.ml.argoproj.io/description: |
+      Perform a training sequence
+      Find parameter optimized network
+  spec:
+    arguments:
+      parameters:
+        - name: train_image
+          value: 'sci-ai-docker-internal.ha-us.dso.thermofisher.net/ks:0.0.92'
+        - name: description
+          value: 'Add pdf documents to data store'
+        - name: docs
+          value: 'pipelines/xlsx/BID_SKU.xlsx'
+          # Start step to test/recover failed runs
+        - name: start
+          value: 1
+          # Start container and wait for debugger to attach
+        - name: debug
+          value: false
+          # Perform minimum run to test code execution
+        - name: minimum
+          value: false
+        - name: s3_name
+          value: ksdata
+        - name: db
+          value: ksdata
+        - name: api
+          value: AzureOpenaiDev
+        - name: engine
+          value: text-embedding-ada-002
+        - name: archivekey
+          value: none
+        - name: start_id
+          value: 0
+
+    entrypoint: pdf-embedding
+    priority: 1
+    templates:
+      - name: pdf-embedding
+        dag:
+          tasks:
+            - name: ddp-mnist
+              template: run-python
+              arguments:
+                parameters:
+                  - {name: script, value: "test/ddpmnist.py"}
+            - name: FSDP-mnist
+              dependencies: [ddp-mnist]
+              template: run-python
+              arguments:
+                parameters: 
+                  - {name: script, value: "test/FSDP_mnist.py"}
+
+      - name: run-python
+        inputs:
+          parameters:
+            - {name: script, value: "test/ddpmnist.py"}
+            - {name: description, value: "{{workflow.parameters.description}}"}
+            - {name: debug, value: "{{workflow.parameters.debug}}"}
+            - {name: minimum, value: "{{workflow.parameters.minimum}}"}
+            - {name: taskparam, value: ""}
+        container:
+          image: '{{workflow.parameters.train_image}}'
+          command:
+            - python3
+          args:
+            - '{{inputs.parameters.script}}'
+
+          ports:
+            - name: debug
+              containerPort: 3000
+              #hostPort: 3000
+            - name: mp
+              containerPort: 12355
+          resources:
+            requests:
+              ephemeral-storage: "20Gi"
+              "nvidia.com/gpu": '2'
+            limits:
+              ephemeral-storage: "40Gi"
+              "nvidia.com/gpu": '2'
+          retryStrategy:
+            limit: "3"
+            retryPolicy: "Always"
