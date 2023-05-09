@@ -75,7 +75,7 @@ workflow:
               containerPort: 3000
               #hostPort: 3000
             - name: mp
-              containerPort: 12355
+              containerPort: 29500
           resources:
             requests:
               ephemeral-storage: "20Gi"

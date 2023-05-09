@@ -26,7 +26,7 @@ ENV PYTHONUNBUFFERED=1
 
 # port 3000: debugger
 # port 6006: tensorboard
-EXPOSE 3000 6006 
+EXPOSE 3000 6006 29500
 # PYTHONUNBUFFERED=1 smooths the logfile updates in Kubernetes
 
 #ARG CACHEBUST 

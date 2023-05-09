@@ -19,7 +19,6 @@ handle parametric dependencies
 
 Deep learning in Dynamcic systems
 [Linear Transformers Are Secretly Fast Weight Programmers](https://arxiv.org/pdf/2102.11174.pdf).  [Video discussion](https://www.youtube.com/watch?v=RSSVWpBak6s).  Makes a strong parallel between transformers and LTI systems treated as a data retrieval problem.  Investigates eliminating the softmax.  
-[Creating a Linear Transformer Model for Circuit Simulations](https://resources.pcb.cadence.com/blog/2019-creating-a-linear-transformer-model-for-circuit-simulations)
 
 [Tensorized Transformer for Dynamical Systems Modeling](https://arxiv.org/pdf/2006.03445.pdf)
 [Transformers for modeling physical systems](https://openreview.net/pdf/c45d1ade1683075a8a4e5bfe568cf3915805af44.pdf).  [Related works](https://deepai.org/publication/tensorized-transformer-for-dynamical-systems-modeling)

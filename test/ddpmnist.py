@@ -1,3 +1,4 @@
+# Try modeling after this: https://pytorch.org/tutorials/intermediate/dist_tuto.html
 import os, sys
 import argparse
 import functools
@@ -24,13 +25,14 @@ from torch.distributed.fsdp.wrap import (
     wrap,
 )
 
-def setup(rank, world_size):
+def setup(rank, world_size, backend='nccl'):
     os.environ['MASTER_ADDR'] = '192.168.0.163'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '29500'
 
     # initialize the process group
     #dist.init_process_group("gloo", rank=rank, world_size=world_size)
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    # dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group(backend, rank=rank, world_size=world_size)
 
 def cleanup():
     dist.destroy_process_group()

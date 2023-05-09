@@ -49,7 +49,7 @@ docker run  -it --rm --gpus $gpus --ipc=host  \
     -p ${PORT2}:5000 \
     -p ${PORT3}:6006 \
     -p ${PORT4}:8888 \
-    -p 12355:12355 \
+    -p 29500:29500 \
     -v /farm:/farm \
     -v /ssd:/ssd \
     -v "$(pwd):/app" \
