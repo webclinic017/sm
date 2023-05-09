@@ -64,6 +64,7 @@ class Net(nn.Module):
         return output
     
 def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
+    print(f'start train {rank=} {world_size=}')
     model.train()
     ddp_loss = torch.zeros(2).to(rank)
     if sampler:
@@ -83,6 +84,7 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 
 def test(model, rank, world_size, test_loader):
+    print(f'start test {rank=} {world_size=}')
     model.eval()
     correct = 0
     ddp_loss = torch.zeros(3).to(rank)
@@ -104,7 +106,7 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 
 def ddp_main(rank, world_size, args):
-    print(__name__)
+    print(f'start ddp_main {rank=} {world_size=}')
     setup(rank, world_size)
     transform=transforms.Compose([
         transforms.ToTensor(),
