@@ -73,9 +73,10 @@ workflow:
           ports:
             - name: debug
               containerPort: 3000
-              #hostPort: 3000
+              hostPort: 3000
             - name: mp
               containerPort: 29500
+              hostPort: 29500
           resources:
             requests:
               ephemeral-storage: "20Gi"

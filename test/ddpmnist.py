@@ -161,11 +161,15 @@ def ddp_main(rank, world_size, args):
 
     cleanup()
 
-if __name__ == '__main__':
-    print(__name__)
-    mp.set_start_method("spawn")
-    # Training settings
+def parse_arguments():
+    import argparse
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+
+    parser.add_argument('-d', action='store_true',help='Wait for debuggee attach')   
+    parser.add_argument('-debug', type=bool, default=False, help='Wait for debuggee attach')
+    parser.add_argument('-debug_port', type=int, default=3000, help='Debug port')
+    parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
+
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=60000, metavar='N',
@@ -182,7 +186,26 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
+
     args = parser.parse_args()
+
+    if args.d:
+        args.debug = args.d
+
+    return args
+
+if __name__ == '__main__':
+    print(__name__)
+    mp.set_start_method("spawn")
+    args = parse_arguments()
+
+    if args.debug:
+        print("Wait for debugger attach on {}:{}".format(args.debug_address, args.debug_port))
+        import debugpy
+
+        debugpy.listen(address=(args.debug_address, args.debug_port)) # Pause the program until a remote debugger is attached
+        debugpy.wait_for_client() # Pause the program until a remote debugger is attached
+        print("Debugger attached")
 
     torch.manual_seed(args.seed)
 
