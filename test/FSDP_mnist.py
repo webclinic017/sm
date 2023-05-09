@@ -1,4 +1,6 @@
+# Try modeling after this: https://pytorch.org/tutorials/intermediate/dist_tuto.html
 import os, sys
+import yaml
 import argparse
 import functools
 import torch
@@ -24,14 +26,14 @@ from torch.distributed.fsdp.wrap import (
     wrap,
 )
 
-def setup(rank, world_size):
-    print(f'start setup  {rank=}')
+def setup(rank, world_size, backend='nccl'):
     os.environ['MASTER_ADDR'] = '192.168.0.163'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '29500'
 
     # initialize the process group
     #dist.init_process_group("gloo", rank=rank, world_size=world_size)
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    # dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group(backend, rank=rank, world_size=world_size)
 
 def cleanup():
     dist.destroy_process_group()
@@ -63,7 +65,7 @@ class Net(nn.Module):
         return output
     
 def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
-    print(f'start train  rank {rank=}')
+    print(f'start train {rank=} {world_size=}')
     model.train()
     ddp_loss = torch.zeros(2).to(rank)
     if sampler:
@@ -83,7 +85,7 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 
 def test(model, rank, world_size, test_loader):
-    print(f'start test rank {rank=}')
+    print(f'start test {rank=} {world_size=}')
     model.eval()
     correct = 0
     ddp_loss = torch.zeros(3).to(rank)
@@ -162,11 +164,15 @@ def fsdp_main(rank, world_size, args):
 
     cleanup()
 
-if __name__ == '__main__':
-    mp.set_start_method("spawn")
-    print(__name__)
-    # Training settings
+def parse_arguments():
+    import argparse
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+
+    parser.add_argument('-d', action='store_true',help='Wait for debuggee attach')   
+    parser.add_argument('-debug', type=bool, default=False, help='Wait for debuggee attach')
+    parser.add_argument('-debug_port', type=int, default=3000, help='Debug port')
+    parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
+
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=60000, metavar='N',
@@ -177,13 +183,32 @@ if __name__ == '__main__':
                         help='learning rate (default: 1.0)')
     parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
                         help='Learning rate step gamma (default: 0.7)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
+
     args = parser.parse_args()
+
+    if args.d:
+        args.debug = args.d
+
+    return args
+
+if __name__ == '__main__':
+    print(__name__)
+    mp.set_start_method("spawn")
+    args = parse_arguments()
+
+    if args.debug:
+        print("Wait for debugger attach on {}:{}".format(args.debug_address, args.debug_port))
+        import debugpy
+
+        debugpy.listen(address=(args.debug_address, args.debug_port)) # Pause the program until a remote debugger is attached
+        debugpy.wait_for_client() # Pause the program until a remote debugger is attached
+        print("Debugger attached")
+
+    print('{}'.format(yaml.dump(args.__dict__) ))
 
     torch.manual_seed(args.seed)
 

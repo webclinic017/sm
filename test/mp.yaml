@@ -20,7 +20,7 @@ workflow:
           value: 1
           # Start container and wait for debugger to attach
         - name: debug
-          value: false
+          value: true
           # Perform minimum run to test code execution
         - name: minimum
           value: false

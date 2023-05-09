@@ -1,5 +1,6 @@
 # Try modeling after this: https://pytorch.org/tutorials/intermediate/dist_tuto.html
 import os, sys
+import yaml
 import argparse
 import functools
 import torch
@@ -108,6 +109,7 @@ def test(model, rank, world_size, test_loader):
 def ddp_main(rank, world_size, args):
     print(f'start ddp_main {rank=} {world_size=}')
     setup(rank, world_size)
+
     transform=transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -141,6 +143,7 @@ def ddp_main(rank, world_size, args):
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     init_start_event.record()
     for epoch in range(1, args.epochs + 1):
+        print(f'ddp_main start {rank=} {epoch=}')
         train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
         test(model, rank, world_size, test_loader)
         scheduler.step()
@@ -180,8 +183,6 @@ def parse_arguments():
                         help='learning rate (default: 1.0)')
     parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
                         help='Learning rate step gamma (default: 0.7)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--save-model', action='store_true', default=False,
@@ -206,6 +207,8 @@ if __name__ == '__main__':
         debugpy.listen(address=(args.debug_address, args.debug_port)) # Pause the program until a remote debugger is attached
         debugpy.wait_for_client() # Pause the program until a remote debugger is attached
         print("Debugger attached")
+
+    print('{}'.format(yaml.dump(args.__dict__) ))
 
     torch.manual_seed(args.seed)
 
