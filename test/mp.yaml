@@ -36,6 +36,10 @@ workflow:
           value: none
         - name: start_id
           value: 0
+        - name: master_addr
+          value: 192.168.0.163
+        - name: master_port
+          value: 29500
 
     entrypoint: pdf-embedding
     priority: 1
@@ -70,13 +74,14 @@ workflow:
           args:
             - '{{inputs.parameters.script}}'
             - -debug={{inputs.parameters.debug}}
+            - -master_port={{workflow.parameters.master_port}}
           ports:
             - name: debug
               containerPort: 3000
               #hostPort: 3000
             - name: mp
-              containerPort: 29500
-              hostPort: 29500
+              containerPort: {{workflow.parameters.master_port}}
+              hostPort: {{workflow.parameters.master_port}}
           resources:
             requests:
               ephemeral-storage: "20Gi"

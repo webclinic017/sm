@@ -26,9 +26,9 @@ from torch.distributed.fsdp.wrap import (
     wrap,
 )
 
-def setup(rank, world_size, backend='nccl'):
-    os.environ['MASTER_ADDR'] = '192.168.0.163'
-    os.environ['MASTER_PORT'] = '29500'
+def setup(rank, world_size, master_addr,  master_port, backend='nccl'):
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = str(master_port)
 
     # initialize the process group
     #dist.init_process_group("gloo", rank=rank, world_size=world_size)
@@ -108,7 +108,8 @@ def test(model, rank, world_size, test_loader):
 
 def ddp_main(rank, world_size, args):
     print(f'start ddp_main {rank=} {world_size=}')
-    setup(rank, world_size)
+    setup(rank, world_size, args.master_addr, args.master_port, args.backend)
+    print(f'prepair dataset')
 
     transform=transforms.Compose([
         transforms.ToTensor(),
@@ -173,11 +174,17 @@ def parse_arguments():
     parser.add_argument('-debug_port', type=int, default=3000, help='Debug port')
     parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
 
+    parser.add_argument('-master_addr', type=str, default='192.168.0.163', help='multiprocessing master address')
+    parser.add_argument('-master_port', type=int, default=29500, help='multiprocessing port')
+    parser.add_argument('-backend', type=str, default='nccl', choices=['nccl', 'gloo', 'mpi'], help='Debug port')
+
+    
+
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=60000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
+    parser.add_argument('--epochs', type=int, default=3, metavar='N',
                         help='number of epochs to train (default: 14)')
     parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                         help='learning rate (default: 1.0)')
