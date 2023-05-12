@@ -20,7 +20,7 @@ workflow:
           value: 1
           # Start container and wait for debugger to attach
         - name: debug
-          value: true
+          value: false
           # Perform minimum run to test code execution
         - name: minimum
           value: false
@@ -73,7 +73,7 @@ workflow:
           ports:
             - name: debug
               containerPort: 3000
-              hostPort: 3000
+              #hostPort: 3000
             - name: mp
               containerPort: 29500
               hostPort: 29500
