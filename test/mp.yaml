@@ -80,8 +80,8 @@ workflow:
               containerPort: 3000
               #hostPort: 3000
             - name: mp
-              containerPort: {{workflow.parameters.master_port}}
-              hostPort: {{workflow.parameters.master_port}}
+              containerPort: 29500
+              hostPort: 29500
           resources:
             requests:
               ephemeral-storage: "20Gi"
