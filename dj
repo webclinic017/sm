@@ -3,7 +3,7 @@ source ./config/config.sh
 if [ "$1" != "" ]; then
     UTIL_PORTS=$1
 elif [[ -z "${UTIL_PORTS}" ]]; then
-    UTIL_PORTS=33301
+    UTIL_PORTS=32221
 fi
 
 if [ "$2" != "" ]; then
@@ -17,14 +17,14 @@ fi
 if [ "$3" != "" ]; then
     image_name="$3"
 elif [[ -z "${image_name}" ]]; then
-    image_name=${dev}
+    image_name=${job}
 fi
 echo image_name=${image_name}
 
 if [ "$4" != "" ]; then
     CONTAINER_NAME="$4"
 elif [[ -z "${CONTAINER_NAME}" ]]; then
-    CONTAINER_NAME='dev'
+    CONTAINER_NAME='job'
 fi
 echo CONTAINER_NAME=${CONTAINER_NAME}
 
@@ -42,16 +42,14 @@ docker stop ${CONTAINER_NAME} || true && docker rm ${CONTAINER_NAME} || true
 
 set -x
 
-docker run  -it --rm --gpus $gpus --ipc=host  \
+docker run -it --rm --gpus $gpus --ipc=host \
     --name $CONTAINER_NAME \
     -p $SSH_PORT:22 \
     -p ${PORT1}:3000 \
     -p ${PORT2}:5000 \
     -p ${PORT3}:6006 \
     -p ${PORT4}:8888 \
-    -p 12355:12355 \
+    -p 29500:29500 \
     -v /farm:/farm \
     -v /ssd:/ssd \
-    -v "$(pwd):/app" \
-    --entrypoint=/bin/bash \
     ${image_name}

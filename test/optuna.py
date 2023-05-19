@@ -1,18 +1,18 @@
-# Try modeling after this: https://pytorch.org/tutorials/intermediate/dist_tuto.html
-import os, sys
-import yaml
+# Based on: https://github.com/pytorch/examples/blob/master/mnist/main.py
+import os
 import argparse
 import functools
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
 from torchvision import datasets, transforms
+
 
 from torch.optim.lr_scheduler import StepLR
 
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -26,14 +26,12 @@ from torch.distributed.fsdp.wrap import (
     wrap,
 )
 
-def setup(rank, world_size, master_addr,  master_port, backend='nccl'):
-    os.environ['MASTER_ADDR'] = master_addr
-    os.environ['MASTER_PORT'] = str(master_port)
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
 
     # initialize the process group
-    #dist.init_process_group("gloo", rank=rank, world_size=world_size)
-    # dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
     dist.destroy_process_group()
@@ -65,7 +63,6 @@ class Net(nn.Module):
         return output
     
 def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=None):
-    print(f'start train {rank=} {world_size=}')
     model.train()
     ddp_loss = torch.zeros(2).to(rank)
     if sampler:
@@ -85,7 +82,6 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 
 def test(model, rank, world_size, test_loader):
-    print(f'start test {rank=} {world_size=}')
     model.eval()
     correct = 0
     ddp_loss = torch.zeros(3).to(rank)
@@ -105,47 +101,43 @@ def test(model, rank, world_size, test_loader):
         print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, int(ddp_loss[1]), int(ddp_loss[2]),
             100. * ddp_loss[1] / ddp_loss[2]))
-
-def main(rank, world_size, args):
-    print(f'start ddp_main {rank=} {world_size=}')
-    setup(rank, world_size, args.master_addr, args.master_port, args.backend)
-    print(f'prepair dataset')
+        
+def fsdp_main(rank, world_size, args):
+    setup(rank, world_size)
 
     transform=transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
 
-    train_dset = datasets.MNIST('data', train=True, download=True, transform=transform)
-    train_sampler = DistributedSampler(train_dset, rank=rank, num_replicas=world_size, shuffle=True)
+    dataset1 = datasets.MNIST('data', train=True, download=True, transform=transform)
+    sampler1 = DistributedSampler(dataset1, rank=rank, num_replicas=world_size, shuffle=True)
 
-    test_dset = datasets.MNIST('data', train=False, transform=transform)
-    test_sampler = DistributedSampler(test_dset, rank=rank, num_replicas=world_size)
+    dataset2 = datasets.MNIST('data', train=False, transform=transform)
+    sampler2 = DistributedSampler(dataset2, rank=rank, num_replicas=world_size)
 
-    train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler}
-    test_kwargs = {'batch_size': args.test_batch_size, 'sampler': test_sampler}
+    train_kwargs = {'batch_size': args.batch_size, 'sampler': sampler1}
+    test_kwargs = {'batch_size': args.test_batch_size, 'sampler': sampler2}
     cuda_kwargs = {'num_workers': 2, 'pin_memory': True, 'shuffle': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
 
-    train_loader = torch.utils.data.DataLoader(train_dset,**train_kwargs)
-    test_loader = torch.utils.data.DataLoader(test_dset, **test_kwargs)
+    train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
+    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
     init_start_event = torch.cuda.Event(enable_timing=True)
     init_end_event = torch.cuda.Event(enable_timing=True)
 
     torch.cuda.set_device(rank)
     model = Net().to(rank)
-    model = DDP(model)
+    model = FSDP(model)
 
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr)
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
 
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     init_start_event.record()
     for epoch in range(1, args.epochs + 1):
-        print(f'main start {rank=} {epoch=}')
-        train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
+        train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=sampler1)
         test(model, rank, world_size, test_loader)
         scheduler.step()
 
@@ -165,67 +157,32 @@ def main(rank, world_size, args):
 
     cleanup()
 
-def parse_arguments():
-    import argparse
+if __name__ == '__main__':
+    # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-
-    parser.add_argument('-d', action='store_true',help='Wait for debuggee attach')   
-    parser.add_argument('-debug', type=bool, default=False, help='Wait for debuggee attach')
-    parser.add_argument('-debug_port', type=int, default=3000, help='Debug port')
-    parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
-
-    parser.add_argument('-master_addr', type=str, default='192.168.0.163', help='multiprocessing master address')
-    parser.add_argument('-master_port', type=int, default=12355, help='multiprocessing port')
-    parser.add_argument('-backend', type=str, default='nccl', choices=['nccl', 'gloo', 'mpi'], help='Debug port')
-
-    
-
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=60000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=3, metavar='N',
+    parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 14)')
     parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
                         help='learning rate (default: 1.0)')
     parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
                         help='Learning rate step gamma (default: 0.7)')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
-
     args = parser.parse_args()
-
-    if args.d:
-        args.debug = args.d
-
-    return args
-
-if __name__ == '__main__':
-    print(__name__)
-    mp.set_start_method("spawn")
-    args = parse_arguments()
-
-    if args.debug:
-        print("Wait for debugger attach on {}:{}".format(args.debug_address, args.debug_port))
-        import debugpy
-
-        debugpy.listen(address=(args.debug_address, args.debug_port)) # Pause the program until a remote debugger is attached
-        debugpy.wait_for_client() # Pause the program until a remote debugger is attached
-        print("Debugger attached")
-
-    print('{}'.format(yaml.dump(args.__dict__) ))
 
     torch.manual_seed(args.seed)
 
     WORLD_SIZE = torch.cuda.device_count()
     #WORLD_SIZE = 1
-    print('Start mp.Process')
-    processes = []
-    for rank in range(WORLD_SIZE):
-        p = mp.Process(target=main, args=(rank, WORLD_SIZE, args))
-        p.start()
-        processes.append(p)
-    for p in processes:
-        p.join()
+    mp.spawn(fsdp_main,
+        args=(WORLD_SIZE, args),
+        nprocs=WORLD_SIZE,
+        join=True)

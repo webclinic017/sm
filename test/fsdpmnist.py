@@ -106,7 +106,7 @@ def test(model, rank, world_size, test_loader):
             test_loss, int(ddp_loss[1]), int(ddp_loss[2]),
             100. * ddp_loss[1] / ddp_loss[2]))
 
-def fsdp_main(rank, world_size, args):
+def main(rank, world_size, args):
     print(f'start ddp_main {rank=} {world_size=}')
     setup(rank, world_size, args.master_addr, args.master_port, args.backend)
     print(f'prepair dataset')
@@ -144,7 +144,7 @@ def fsdp_main(rank, world_size, args):
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     init_start_event.record()
     for epoch in range(1, args.epochs + 1):
-        print(f'fsdp_main start {rank=} {epoch=}')
+        print(f'main start {rank=} {epoch=}')
         train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler=train_sampler)
         test(model, rank, world_size, test_loader)
         scheduler.step()
@@ -175,7 +175,7 @@ def parse_arguments():
     parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
 
     parser.add_argument('-master_addr', type=str, default='192.168.0.163', help='multiprocessing master address')
-    parser.add_argument('-master_port', type=int, default=29500, help='multiprocessing port')
+    parser.add_argument('-master_port', type=int, default=12355, help='multiprocessing port')
     parser.add_argument('-backend', type=str, default='nccl', choices=['nccl', 'gloo', 'mpi'], help='Debug port')
 
     
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     print('Start mp.Process')
     processes = []
     for rank in range(WORLD_SIZE):
-        p = mp.Process(target=fsdp_main, args=(rank, WORLD_SIZE, args))
+        p = mp.Process(target=main, args=(rank, WORLD_SIZE, args))
         p.start()
         processes.append(p)
     for p in processes:
