@@ -38,8 +38,6 @@ workflow:
           value: 0
         - name: master_addr
           value: 192.168.0.163
-        - name: master_port
-          value: 29500
 
     entrypoint: pdf-embedding
     priority: 1
@@ -57,7 +55,7 @@ workflow:
               template: run-python
               arguments:
                 parameters: 
-                  - {name: script, value: "test/FSDP_mnist.py"}
+                  - {name: script, value: "test/fsdpmnist.py"}
 
       - name: run-python
         inputs:
@@ -73,8 +71,6 @@ workflow:
             - python3
           args:
             - '{{inputs.parameters.script}}'
-            - -debug={{inputs.parameters.debug}}
-            - -master_port={{workflow.parameters.master_port}}
           ports:
             - name: debug
               containerPort: 3000
