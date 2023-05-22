@@ -116,10 +116,10 @@ def main(rank, world_size, args):
         transforms.Normalize((0.1307,), (0.3081,))
     ])
 
-    train_dset = datasets.MNIST('data', train=True, download=True, transform=transform)
+    train_dset = datasets.MNIST('/ssd/datasets', train=True, download=True, transform=transform)
     train_sampler = DistributedSampler(train_dset, rank=rank, num_replicas=world_size, shuffle=True)
 
-    test_dset = datasets.MNIST('data', train=False, transform=transform)
+    test_dset = datasets.MNIST('/ssd/datasets', train=False, transform=transform)
     test_sampler = DistributedSampler(test_dset, rank=rank, num_replicas=world_size)
 
     train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler}

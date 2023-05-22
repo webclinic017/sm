@@ -38,6 +38,12 @@ workflow:
           value: 0
         - name: master_addr
           value: 192.168.0.163
+        - name: dataset_path
+          value: /ssd/datasets
+        - name: data_dir
+          value: /ssd/data_dir
+        - name: tb_logs
+          value: /ssd/tb
 
     entrypoint: pdf-embedding
     priority: 1
@@ -65,8 +71,25 @@ workflow:
             - {name: debug, value: "{{workflow.parameters.debug}}"}
             - {name: minimum, value: "{{workflow.parameters.minimum}}"}
             - {name: taskparam, value: ""}
+        volumes:
+          - name: datasets
+            persistentVolumeClaim:
+              claimName: datasets
+          - name: workerstorage
+            persistentVolumeClaim:
+              claimName: workerstorage
+          - name: tblogs
+            persistentVolumeClaim:
+              claimName: tblogs
         container:
           image: '{{workflow.parameters.train_image}}'
+          volumeMounts:
+            - mountPath: '{{workflow.parameters.dataset_path}}'
+              name: datasets
+            - name: workerstorage
+              mountPath: '{{workflow.parameters.store}}'
+            - name: tblogs
+              mountPath: '{{workflow.parameters.tb_logs}}'
           command:
             - python3
           args:

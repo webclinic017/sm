@@ -119,7 +119,7 @@ def main(rank, world_size, args):
     train_dset = datasets.MNIST('data', train=True, download=True, transform=transform)
     train_sampler = DistributedSampler(train_dset, rank=rank, num_replicas=world_size, shuffle=True)
 
-    test_dset = datasets.MNIST('data', train=False, transform=transform)
+    test_dset = datasets.MNIST(args.dataset_dir, train=False, transform=transform)
     test_sampler = DistributedSampler(test_dset, rank=rank, num_replicas=world_size)
 
     train_kwargs = {'batch_size': args.batch_size, 'sampler': train_sampler}
@@ -174,11 +174,13 @@ def parse_arguments():
     parser.add_argument('-debug_port', type=int, default=3000, help='Debug port')
     parser.add_argument('-debug_address', type=str, default='0.0.0.0', help='Debug port')
 
-    parser.add_argument('-master_addr', type=str, default='192.168.0.163', help='multiprocessing master address')
-    parser.add_argument('-master_port', type=int, default=12355, help='multiprocessing port')
-    parser.add_argument('-backend', type=str, default='nccl', choices=['nccl', 'gloo', 'mpi'], help='Debug port')
+    parser.add_argument('-master_addr', type=str, default='127.0.0.1', help='multiprocessing master address')
+    parser.add_argument('-master_port', type=int, default=12351, help='multiprocessing port')
+    parser.add_argument('-backend', type=str, default='gloo', choices=['nccl', 'gloo', 'mpi'], help='Debug port')
 
-    
+    parser.add_argument('-dataset_dir', type=str, default='/ssd/datasets', help='shared dataset path')
+    parser.add_argument('-tensorboard_dir', type=str, default='/ssd/tb/sm/ddpmnist', help='tensorboard data path')
+    parser.add_argument('-data_dir', type=str, default='/ssd/data/sm/ddpmnist', help='tensorboard data path')
 
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
